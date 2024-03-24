@@ -1,23 +1,34 @@
 package main
 
 import (
-	"io"
 	"log"
 	"net/http"
     "fmt"
+    "encoding/json"
 )
 
+type User struct {
+    Id int `json:"id"`
+    Name string `json:"name"`
+}
+
 func main() {
-	h1 := func(w http.ResponseWriter, _ *http.Request) {
-		io.WriteString(w, "Hello from a HandleFunc #1!\n")
+	getUsers := func(w http.ResponseWriter, _ *http.Request) {
+        users := []User{
+            {Id: 1, Name: "Foo"},
+            {Id: 2, Name: "Bar"},
+        }
+
+        usersJSON, err := json.Marshal(users)
+        if err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+        
+        w.Write(usersJSON)
 	}
 
-    h2 := func(w http.ResponseWriter, _ *http.Request) {
-		io.WriteString(w, "Hello from a HandleFunc #2!\n")
-	}
-
-	http.HandleFunc("/", h1)
-	http.HandleFunc("/endpoint", h2)
+	http.HandleFunc("/users", getUsers)
 
     fmt.Printf("Starting server at port 8080\n")
     log.Fatal(http.ListenAndServe(":8080", nil))
