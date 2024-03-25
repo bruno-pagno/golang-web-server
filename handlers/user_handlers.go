@@ -1,23 +1,44 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"golang-web-server/models"
 	"net/http"
 )
 
-func GetUsers(w http.ResponseWriter, r *http.Request) {
-	users := []models.User{
-		{Id: 1, Name: "Foo"},
-		{Id: 2, Name: "Bar"},
-	}
+var db *sql.DB
 
-	usersJSON, err := json.Marshal(users)
+func SetDatabase(database *sql.DB) {
+	db = database
+}
+
+func GetUsers(w http.ResponseWriter, r *http.Request) {
+	rows, err := db.Query("SELECT id, name FROM users")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Write(usersJSON)
+	defer rows.Close()
+
+	var users []models.User
+	for rows.Next() {
+		var user models.User
+		if err := rows.Scan(&user.Id, &user.Name); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		users = append(users, user)
+	}
+
+	response, err := json.Marshal(users)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(response)
 }
 
 func CreateUser(w http.ResponseWriter, r *http.Request) {
@@ -29,16 +50,29 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if user.Id <= 0 || user.Name == "" {
-		http.Error(w, "Missing or invalid 'Id' and/or 'name'", http.StatusBadRequest)
+	if user.Name == "" {
+		http.Error(w, "Missing 'name'", http.StatusBadRequest)
 		return
 	}
 
-	response, err := json.Marshal(user)
+	statement := `INSERT INTO users (name) VALUES ($1) RETURNING id`
+	err = db.QueryRow(statement, user.Name).Scan(&user.Id)
 	if err != nil {
-		http.Error(w, "Error encoding response JSON", http.StatusInternalServerError)
+		http.Error(w, "Error inserting new user", http.StatusInternalServerError)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(response)
+	json.NewEncoder(w).Encode(user)
+}
+
+func UsersRouter(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		GetUsers(w, r)
+	case http.MethodPost:
+		CreateUser(w, r)
+	default:
+		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
+	}
 }

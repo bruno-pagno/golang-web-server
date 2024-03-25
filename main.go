@@ -24,19 +24,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	handlers.SetDatabase(db)
 	fmt.Println("Connected to the POSTGRESQL database")
 
-	http.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case "GET":
-			handlers.GetUsers(w, r)
-		case "POST":
-			handlers.CreateUser(w, r)
-		default:
-			http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
-		}
-	})
-
+	http.HandleFunc("/users", handlers.UsersRouter)
 	fmt.Printf("Starting server at port 8080\n")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
